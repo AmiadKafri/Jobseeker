@@ -346,7 +346,7 @@ export function CompanyList({ onSelectCompany }: CompanyListProps) {
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="max-h-[calc(100vh-300px)] overflow-y-auto pr-2 space-y-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
             {[...companies]
               .sort((a, b) => {
                 if (starredCompanies.includes(a.id) && !starredCompanies.includes(b.id)) return -1
@@ -420,4 +420,3 @@ export function CompanyList({ onSelectCompany }: CompanyListProps) {
     </div>
   )
 }
-
