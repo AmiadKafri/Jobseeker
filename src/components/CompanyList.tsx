@@ -14,6 +14,7 @@ interface CompanyEntry {
   customCompany: string
   updated: boolean
   lastUpdated: string | null
+  link?: string // לינק לאתר החברה
 }
 
 interface CompanyListProps {
@@ -83,6 +84,7 @@ export function CompanyList({ onSelectCompany }: CompanyListProps) {
         customCompany: "",
         updated: false,
         lastUpdated: null,
+        link: ""
       },
     ])
   }
@@ -93,6 +95,10 @@ export function CompanyList({ onSelectCompany }: CompanyListProps) {
 
   const updateCustomCompany = (id: string, customCompany: string) => {
     setCompanies(companies.map((c) => (c.id === id ? { ...c, company: "", customCompany } : c)))
+  }
+
+  const updateCompanyLink = (id: string, link: string) => {
+    setCompanies(companies.map((c) => (c.id === id ? { ...c, link } : c)))
   }
 
   const toggleUpdated = (id: string) => {
@@ -237,70 +243,94 @@ export function CompanyList({ onSelectCompany }: CompanyListProps) {
                   onDragEnd={handleDragEnd}
                   onDragOver={(e) => handleDragOver(e, entry.id)}
                   onDrop={(e) => handleDrop(e, entry.id)}
-                  className={`flex items-center gap-3 bg-white rounded-md p-2 transition-colors ${
+                  className={`flex flex-col gap-1 bg-white rounded-md p-2 transition-colors ${
                     dragOverItemId === entry.id ? "border-2 border-indigo-300" : "border-2 border-transparent"
                   }`}
                 >
-                  <div className="cursor-move text-gray-400 hover:text-gray-600">
-                    <GripVertical size={20} />
-                  </div>
-                  <button
-                    onClick={() => toggleStar(entry.id)}
-                    className={`text-yellow-400 hover:text-yellow-500 transition-colors ${
-                      starredCompanies.includes(entry.id) ? "opacity-100" : "opacity-30"
-                    }`}
-                  >
-                    <Star size={20} fill={starredCompanies.includes(entry.id) ? "currentColor" : "none"} />
-                  </button>
-                  <div className="flex-1">
-                    <div className="relative">
-                      <select
-                        value={entry.company}
-                        onChange={(e) => {
-                          const value = e.target.value
-                          if (value === "custom") {
-                            updateCustomCompany(entry.id, entry.customCompany || "")
-                          } else {
-                            updateCompany(entry.id, value)
-                          }
-                        }}
-                        className="w-full p-2 text-sm border border-gray-300 rounded-md focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                      >
-                        <option value="">Select a company</option>
-                        {companyOptions.map((company) => (
-                          <option key={company} value={company}>
-                            {company}
-                          </option>
-                        ))}
-                        <option value="custom">Enter custom company</option>
-                      </select>
-                      {entry.company === "" && (
-                        <input
-                          type="text"
-                          value={entry.customCompany}
-                          onChange={(e) => updateCustomCompany(entry.id, e.target.value)}
-                          placeholder="Enter custom company name"
-                          className="absolute inset-0 w-full p-2 text-sm border border-gray-300 rounded-md focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                        />
-                      )}
+                  <div className="flex items-center gap-3">
+                    <div className="cursor-move text-gray-400 hover:text-gray-600">
+                      <GripVertical size={20} />
                     </div>
+                    <button
+                      onClick={() => toggleStar(entry.id)}
+                      className={`text-yellow-400 hover:text-yellow-500 transition-colors ${
+                        starredCompanies.includes(entry.id) ? "opacity-100" : "opacity-30"
+                      }`}
+                    >
+                      <Star size={20} fill={starredCompanies.includes(entry.id) ? "currentColor" : "none"} />
+                    </button>
+                    <div className="flex-1">
+                      <div className="relative">
+                        <select
+                          value={entry.company}
+                          onChange={(e) => {
+                            const value = e.target.value
+                            if (value === "custom") {
+                              updateCustomCompany(entry.id, entry.customCompany || "")
+                            } else {
+                              updateCompany(entry.id, value)
+                            }
+                          }}
+                          className="w-full p-2 text-sm border border-gray-300 rounded-md focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                        >
+                          <option value="">Select a company</option>
+                          {companyOptions.map((company) => (
+                            <option key={company} value={company}>
+                              {company}
+                            </option>
+                          ))}
+                          <option value="custom">Enter custom company</option>
+                        </select>
+                        {entry.company === "" && (
+                          <input
+                            type="text"
+                            value={entry.customCompany}
+                            onChange={(e) => updateCustomCompany(entry.id, e.target.value)}
+                            placeholder="Enter custom company name"
+                            className="absolute inset-0 w-full p-2 text-sm border border-gray-300 rounded-md focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                          />
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => toggleUpdated(entry.id)}
+                      className={`w-8 h-8 flex items-center justify-center rounded-md border transition-colors ${
+                        !entry.updated
+                          ? "bg-red-50 border-red-200 text-red-600"
+                          : "bg-green-50 border-green-200 text-green-600"
+                      }`}
+                    >
+                      {!entry.updated ? <X className="w-5 h-5" /> : <Check className="w-5 h-5" />}
+                    </button>
+                    <button
+                      onClick={() => deleteCompany(entry.id)}
+                      className="text-red-500 hover:text-red-600 transition-colors"
+                    >
+                      <Trash2 size={20} />
+                    </button>
+                  </div>                  {/* לינק לאתר החברה */}                  <div className="flex items-center gap-3">
+                    <div className="cursor-move text-gray-400 hover:text-gray-600 opacity-0">
+                      <GripVertical size={20} />
+                    </div>
+                    <button className="text-yellow-400 hover:text-yellow-500 transition-colors opacity-0">
+                      <Star size={20} />
+                    </button>
+                    <div className="flex-1">
+                      <input
+                        type="url"
+                        value={entry.link || ''}
+                        onChange={(e) => updateCompanyLink(entry.id, e.target.value)}
+                        placeholder="Company website link (https://...)"
+                        className="w-full p-2 text-sm border border-gray-300 rounded-md focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                      />
+                    </div>
+                    <button className="w-8 h-8 opacity-0">
+                      <X className="w-5 h-5" />
+                    </button>
+                    <button className="opacity-0">
+                      <Trash2 size={20} />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => toggleUpdated(entry.id)}
-                    className={`w-8 h-8 flex items-center justify-center rounded-md border transition-colors ${
-                      !entry.updated
-                        ? "bg-red-50 border-red-200 text-red-600"
-                        : "bg-green-50 border-green-200 text-green-600"
-                    }`}
-                  >
-                    {!entry.updated ? <X className="w-5 h-5" /> : <Check className="w-5 h-5" />}
-                  </button>
-                  <button
-                    onClick={() => deleteCompany(entry.id)}
-                    className="text-red-500 hover:text-red-600 transition-colors"
-                  >
-                    <Trash2 size={20} />
-                  </button>
                 </div>
               ))}
           </div>
