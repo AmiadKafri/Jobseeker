@@ -1,12 +1,13 @@
 import type React from "react"
 import { useState, useEffect, useRef } from "react"
-import { Plus, X, LogOut } from "lucide-react"
+import { Plus, X, LogOut, Download } from "lucide-react"
 import { Column } from "./components/Column"
 import { AuthModal } from "./components/AuthModal"
 import { CompanyList } from "./components/CompanyList"
 import { useAuth } from "./contexts/AuthContext"
 import toast, { Toaster } from "react-hot-toast"
 import type { JobCard, Column as ColumnType } from "./types"
+import Papa from 'papaparse'
 
 const initialColumns: ColumnType[] = [
   { id: "1", title: "Wishlist", status: "wishlist" },
@@ -192,6 +193,31 @@ function App() {
     }
   }
 
+  // פונקציה לייצוא כל המשרות לקובץ CSV
+  const handleExport = () => {
+    if (!jobs.length) {
+      toast.error('No jobs to export')
+      return
+    }
+    const exportData = jobs.map(({ id, position, ...job }) => ({
+      company: job.company,
+      title: job.title,
+      status: job.status,
+      notes: job.notes
+    }))
+    const csv = Papa.unparse(exportData)
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', 'jobs_export.csv')
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    toast.success('Exported jobs to CSV!')
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100">
       <Toaster position="top-right" />
@@ -202,13 +228,22 @@ function App() {
               Job Search
             </h1>
             {user ? (
-              <button
-                onClick={() => signOut()}
-                className="inline-flex items-center px-3 py-1.5 sm:px-4 sm:py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                <LogOut className="h-4 w-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Sign Out</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleExport}
+                  className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  <Download className="h-4 w-4 mr-1" />
+                  Export
+                </button>
+                <button
+                  onClick={() => signOut()}
+                  className="inline-flex items-center px-3 py-1.5 sm:px-4 sm:py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  <LogOut className="h-4 w-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Sign Out</span>
+                </button>
+              </div>
             ) : (
               <button
                 onClick={() => setIsAuthModalOpen(true)}
