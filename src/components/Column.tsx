@@ -34,7 +34,7 @@ export function Column({
     >
       <h2 className="text-lg font-semibold mb-4 text-gray-700">{column.title}</h2>
       <div className="space-y-4">
-        {jobs.filter(job => job.status === column.status).map(job => (
+        {jobs.filter(Boolean).filter(job => job.status === column.status).map(job => (
           <JobNode 
             key={job.id} 
             job={job} 

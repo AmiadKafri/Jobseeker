@@ -36,7 +36,7 @@ function App() {
   const touchTimeoutRef = useRef<number | null>(null)
   const initialTouchRef = useRef<{ x: number; y: number } | null>(null)
 
-  const { user, session, loading: authLoading } = useAuth()
+  const { user, session, loading: authLoading, signOut } = useAuth()
 
   // Fetch initial jobs when user/session changes
   useEffect(() => {
@@ -76,7 +76,7 @@ function App() {
       setDraggedJob(null);
 
       try {
-        const updatedJobFromServer = await api.updateJob(session.access_token, draggedJob.id, { status });
+        const updatedJobFromServer = await api.updateJob(draggedJob.id, { status });
         setJobs(prevJobs => prevJobs.map(job => job.id === updatedJobFromServer.id ? updatedJobFromServer : job));
         toast.success(`Moved to ${status}`);
       } catch (error: any) {
@@ -171,7 +171,7 @@ function App() {
       setJobs(jobs.map((job) => (job.id === draggedJob.id ? updatedJobOptimistic : job)));
       
       try {
-        const updatedJobFromServer = await api.updateJob(session.access_token, draggedJob.id, { status: currentColumn });
+        const updatedJobFromServer = await api.updateJob(draggedJob.id, { status: currentColumn });
         setJobs(prevJobs => prevJobs.map(job => job.id === updatedJobFromServer.id ? updatedJobFromServer : job));
         toast.success(`Moved to ${currentColumn}`, {
           duration: 2000, style: { background: "#4F46E5", color: "#fff" },
@@ -203,14 +203,12 @@ function App() {
     const jobPayload: api.AddJobPayload = {
       title: newJob.title,
       company: newJob.company,
-      notes: newJob.notes,
-      status: 'wishlist', // Default status
-      position: { x: 0, y: 0 } // Default position
+      notes: newJob.notes
     };
 
     setIsLoading(true);
     try {
-      const addedJob = await api.addJob(session.access_token, jobPayload);
+      const addedJob = await api.addJob(jobPayload);
       setJobs(prevJobs => [...prevJobs, addedJob]);
       setNewJob({ title: "", company: "", notes: "" });
       setIsModalOpen(false);
@@ -231,7 +229,7 @@ function App() {
     setJobs(jobs.filter((job) => job.id !== jobId)); // Optimistic update
 
     try {
-      await api.deleteJob(session.access_token, jobId);
+      await api.deleteJob(jobId);
       toast.success("Job deleted successfully!");
     } catch (error: any) {
       setJobs(originalJobs); // Revert
@@ -272,10 +270,9 @@ function App() {
   
   // Sign out function from useAuth
   const handleSignOut = async () => {
-    if (!session) return; // Should not happen if user is present
+    if (!session) return;
     try {
-      await api.signOut(session.access_token); // Assuming signOut is part of your api service or directly useAuth's signOut
-      // useAuth().signOut() already handles clearing local session/user state
+      await signOut();
       toast.success("Successfully signed out!");
     } catch (error: any) {
       toast.error(`Sign out failed: ${error.message}`);
@@ -302,7 +299,7 @@ function App() {
                   Export
                 </button>
                 <button
-                  onClick={useAuth().signOut} // Using signOut from useAuth context
+                  onClick={handleSignOut}
                   className="inline-flex items-center px-3 py-1.5 sm:px-4 sm:py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                 >
                   <LogOut className="h-4 w-4 mr-1 sm:mr-2" />
