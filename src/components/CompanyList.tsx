@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from "react"
 import { Building2, Plus, Check, X, MoreHorizontal, Star, Trash2, GripVertical } from "lucide-react"
+import type { Company } from '../services/api';
+import { getCompanies, addCompany, updateCompany, deleteCompany } from '../services/api';
 
 // Extended list of major companies worldwide
 const companyOptions = [
@@ -22,108 +24,45 @@ interface CompanyListProps {
 }
 
 export function CompanyList({ onSelectCompany }: CompanyListProps) {
-  const [companies, setCompanies] = useState<CompanyEntry[]>(() => {
-    const saved = localStorage.getItem("companyTracking")
-    return saved ? JSON.parse(saved) : []
-  })
-  const [isFrequencyMenuOpen, setIsFrequencyMenuOpen] = useState(false)
-  const [updateFrequency, setUpdateFrequency] = useState<"daily" | "weekly" | null>(null)
-  const [starredCompanies, setStarredCompanies] = useState<string[]>(() => {
-    const saved = localStorage.getItem("starredCompanies")
-    return saved ? JSON.parse(saved) : []
-  })
-  const [isListVisible, setIsListVisible] = useState(true)
-  const [draggedItem, setDraggedItem] = useState<CompanyEntry | null>(null)
-  const [dragOverItemId, setDragOverItemId] = useState<string | null>(null)
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFrequencyMenuOpen, setIsFrequencyMenuOpen] = useState(false);
+  const [updateFrequency, setUpdateFrequency] = useState<'daily' | 'weekly' | null>(null);
+  const [isListVisible, setIsListVisible] = useState(true);
+  const [draggedItem, setDraggedItem] = useState<Company | null>(null);
+  const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
 
+  // Fetch companies from Supabase
   useEffect(() => {
-    localStorage.setItem("companyTracking", JSON.stringify(companies))
-  }, [companies])
+    setIsLoading(true);
+    getCompanies()
+      .then(setCompanies)
+      .catch(() => setCompanies([]))
+      .finally(() => setIsLoading(false));
+  }, []);
 
-  useEffect(() => {
-    localStorage.setItem("starredCompanies", JSON.stringify(starredCompanies))
-  }, [starredCompanies])
+  const addNewRow = async () => {
+    const newCompany = {
+      company: '',
+      custom_company: '',
+      updated: false,
+      last_updated: null,
+      link: '',
+      starred: false,
+    };
+    const created = await addCompany(newCompany);
+    setCompanies((prev) => [created, ...prev]);
+  };
 
-  useEffect(() => {
-    const checkUpdates = () => {
-      const today = new Date().toISOString().split("T")[0]
-      if (updateFrequency === "daily") {
-        setCompanies((prevCompanies) =>
-          prevCompanies.map((company) => {
-            if (company.lastUpdated !== today) {
-              return { ...company, updated: false }
-            }
-            return company
-          }),
-        )
-      } else if (updateFrequency === "weekly") {
-        const weekAgo = new Date()
-        weekAgo.setDate(weekAgo.getDate() - 7)
-        setCompanies((prevCompanies) =>
-          prevCompanies.map((company) => {
-            if (!company.lastUpdated || new Date(company.lastUpdated) < weekAgo) {
-              return { ...company, updated: false }
-            }
-            return company
-          }),
-        )
-      }
-    }
+  const updateCompanyField = async (id: string, field: keyof Company, value: any) => {
+    const updated = await updateCompany(id, { [field]: value });
+    setCompanies((prev) => prev.map((c) => (c.id === id ? updated : c)));
+  };
 
-    checkUpdates()
-    const interval = setInterval(checkUpdates, 1000 * 60 * 60)
-    return () => clearInterval(interval)
-  }, [updateFrequency])
-
-  const addNewRow = () => {
-    setCompanies([
-      ...companies,
-      {
-        id: crypto.randomUUID(),
-        company: "",
-        customCompany: "",
-        updated: false,
-        lastUpdated: null,
-        link: ""
-      },
-    ])
-  }
-
-  const updateCompany = (id: string, company: string) => {
-    setCompanies(companies.map((c) => (c.id === id ? { ...c, company, customCompany: "" } : c)))
-  }
-
-  const updateCustomCompany = (id: string, customCompany: string) => {
-    setCompanies(companies.map((c) => (c.id === id ? { ...c, company: "", customCompany } : c)))
-  }
-
-  const updateCompanyLink = (id: string, link: string) => {
-    setCompanies(companies.map((c) => (c.id === id ? { ...c, link } : c)))
-  }
-
-  const toggleUpdated = (id: string) => {
-    const today = new Date().toISOString().split("T")[0]
-    setCompanies(
-      companies.map((c) =>
-        c.id === id
-          ? {
-              ...c,
-              updated: !c.updated,
-              lastUpdated: !c.updated ? today : c.lastUpdated,
-            }
-          : c,
-      ),
-    )
-  }
-
-  const toggleStar = (id: string) => {
-    setStarredCompanies((prev) => (prev.includes(id) ? prev.filter((cId) => cId !== id) : [...prev, id]))
-  }
-
-  const deleteCompany = (id: string) => {
-    setCompanies((prev) => prev.filter((c) => c.id !== id))
-    setStarredCompanies((prev) => prev.filter((cId) => cId !== id))
-  }
+  const deleteCompanyRow = async (id: string) => {
+    await deleteCompany(id);
+    setCompanies((prev) => prev.filter((c) => c.id !== id));
+  };
 
   const handleDragStart = (e: React.DragEvent<HTMLDivElement>, item: CompanyEntry) => {
     setDraggedItem(item)
@@ -158,6 +97,44 @@ export function CompanyList({ onSelectCompany }: CompanyListProps) {
     setDraggedItem(null)
     setDragOverItemId(null)
   }
+
+  // Star/unstar company
+  const toggleStar = async (id: string) => {
+    const company = companies.find((c) => c.id === id);
+    if (!company) return;
+    const updated = await updateCompany(id, { starred: !company.starred });
+    setCompanies((prev) => prev.map((c) => (c.id === id ? updated : c)));
+  };
+
+  // Update company name
+  const updateCompanyName = async (id: string, company: string) => {
+    const updated = await updateCompany(id, { company, custom_company: '' });
+    setCompanies((prev) => prev.map((c) => (c.id === id ? updated : c)));
+  };
+
+  // Update custom company name
+  const updateCustomCompany = async (id: string, customCompany: string) => {
+    const updated = await updateCompany(id, { company: '', custom_company: customCompany });
+    setCompanies((prev) => prev.map((c) => (c.id === id ? updated : c)));
+  };
+
+  // Update company link
+  const updateCompanyLink = async (id: string, link: string) => {
+    const updated = await updateCompany(id, { link });
+    setCompanies((prev) => prev.map((c) => (c.id === id ? updated : c)));
+  };
+
+  // Toggle updated status
+  const toggleUpdated = async (id: string) => {
+    const company = companies.find((c) => c.id === id);
+    if (!company) return;
+    const today = new Date().toISOString();
+    const updated = await updateCompany(id, {
+      updated: !company.updated,
+      last_updated: !company.updated ? today : company.last_updated,
+    });
+    setCompanies((prev) => prev.map((c) => (c.id === id ? updated : c)));
+  };
 
   return (
     <div className="bg-white rounded-lg shadow-md p-4 w-full">
@@ -231,9 +208,9 @@ export function CompanyList({ onSelectCompany }: CompanyListProps) {
           <div className="max-h-[calc(100vh-300px)] overflow-y-auto pr-2 space-y-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
             {[...companies]
               .sort((a, b) => {
-                if (starredCompanies.includes(a.id) && !starredCompanies.includes(b.id)) return -1
-                if (!starredCompanies.includes(a.id) && starredCompanies.includes(b.id)) return 1
-                return 0
+                if (a.starred && !b.starred) return -1;
+                if (!a.starred && b.starred) return 1;
+                return 0;
               })
               .map((entry) => (
                 <div
@@ -254,21 +231,21 @@ export function CompanyList({ onSelectCompany }: CompanyListProps) {
                     <button
                       onClick={() => toggleStar(entry.id)}
                       className={`text-yellow-400 hover:text-yellow-500 transition-colors ${
-                        starredCompanies.includes(entry.id) ? "opacity-100" : "opacity-30"
+                        entry.starred ? "opacity-100" : "opacity-30"
                       }`}
                     >
-                      <Star size={20} fill={starredCompanies.includes(entry.id) ? "currentColor" : "none"} />
+                      <Star size={20} fill={entry.starred ? "currentColor" : "none"} />
                     </button>
                     <div className="flex-1">
                       <div className="relative">
                         <select
                           value={entry.company}
                           onChange={(e) => {
-                            const value = e.target.value
+                            const value = e.target.value;
                             if (value === "custom") {
-                              updateCustomCompany(entry.id, entry.customCompany || "")
+                              updateCustomCompany(entry.id, entry.custom_company || "");
                             } else {
-                              updateCompany(entry.id, value)
+                              updateCompanyName(entry.id, value);
                             }
                           }}
                           className="w-full p-2 text-sm border border-gray-300 rounded-md focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
@@ -284,7 +261,7 @@ export function CompanyList({ onSelectCompany }: CompanyListProps) {
                         {entry.company === "" && (
                           <input
                             type="text"
-                            value={entry.customCompany}
+                            value={entry.custom_company}
                             onChange={(e) => updateCustomCompany(entry.id, e.target.value)}
                             placeholder="Enter custom company name"
                             className="absolute inset-0 w-full p-2 text-sm border border-gray-300 rounded-md focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
@@ -303,12 +280,13 @@ export function CompanyList({ onSelectCompany }: CompanyListProps) {
                       {!entry.updated ? <X className="w-5 h-5" /> : <Check className="w-5 h-5" />}
                     </button>
                     <button
-                      onClick={() => deleteCompany(entry.id)}
+                      onClick={() => deleteCompanyRow(entry.id)}
                       className="text-red-500 hover:text-red-600 transition-colors"
                     >
                       <Trash2 size={20} />
                     </button>
-                  </div>                  {/* לינק לאתר החברה */}                  <div className="flex items-center gap-3">
+                  </div>
+                  <div className="flex items-center gap-3">
                     <div className="cursor-move text-gray-400 hover:text-gray-600 opacity-0">
                       <GripVertical size={20} />
                     </div>
