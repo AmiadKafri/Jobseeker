@@ -4,7 +4,9 @@ import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 
+if (process.env.NODE_ENV !== 'production') {
 dotenv.config(); // Load .env from project root
+}
 
 // Supabase client initialization
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
