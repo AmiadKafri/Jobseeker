@@ -76,7 +76,45 @@ export async function getCompanies(): Promise<Company[]> {
     .eq('user_id', user.data.user?.id)
     .order('created_at', { ascending: false });
   if (error) throw new Error(error.message);
-  return data as Company[];
+  const companies = data as Company[];
+
+  try {
+    // Reset any "updated" flags that are not from today (local date)
+    const today = new Date();
+    const isSameLocalDate = (iso?: string | null) => {
+      if (!iso) return false;
+      const d = new Date(iso);
+      return d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
+    };
+
+    const idsToReset = companies
+      .filter((c) => c.updated && !isSameLocalDate(c.last_updated))
+      .map((c) => c.id);
+
+    if (idsToReset.length > 0) {
+      const { data: updatedData, error: updateError } = await supabase
+        .from('companies')
+        .update({ updated: false })
+        .in('id', idsToReset)
+        .select();
+      if (updateError) {
+        // don't block on error; just return fetched data
+        console.warn('Failed to reset stale company updates:', updateError.message);
+        return companies;
+      }
+      // Merge updated rows into companies list
+      const updatedMap = (updatedData as Company[]).reduce<Record<string, Company>>((acc, cur) => {
+        acc[cur.id] = cur;
+        return acc;
+      }, {});
+      return companies.map((c) => updatedMap[c.id] ? updatedMap[c.id] : c);
+    }
+  } catch (e) {
+    // ignore and return original
+    console.warn('Error while resetting stale company flags', e);
+  }
+
+  return companies;
 }
 
 export type AddCompanyPayload = Omit<Company, 'id' | 'user_id' | 'created_at' | 'updated_at'>;
