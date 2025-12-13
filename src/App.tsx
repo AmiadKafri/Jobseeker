@@ -320,7 +320,7 @@ function App() {
 
       <main className="max-w-[1920px] mx-auto px-2 sm:px-4 lg:px-8 py-4 sm:py-8">
         { (authLoading || (user && isLoading)) && <div className="text-center py-10">Loading jobs...</div>}
-        { !authLoading && !isLoading && user && (
+        { (authLoading || user) && (
           <div className="flex flex-col lg:flex-row gap-4 lg:gap-6">
             <div className="w-full lg:w-[400px] shrink-0">
               <CompanyList onSelectCompany={handleSelectCompany} />
@@ -335,31 +335,37 @@ function App() {
               </div>
             </div>
             <div className="w-full overflow-x-auto">
-              <div className="hidden lg:flex lg:justify-end mb-4">
-                <button
-                  onClick={() => setIsModalOpen(true)}
-                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Job
-                </button>
-              </div>
-              <div className="inline-flex space-x-4 pb-4 min-w-full">
-                {initialColumns.map((column) => (
-                  <Column
-                    key={column.id}
-                    column={column}
-                    jobs={jobs}
-                    onDragStart={handleDragStart}
-                    onDragOver={handleDragOver}
-                    onDrop={handleDrop}
-                    onDeleteJob={handleDeleteJob}
-                    onTouchStart={handleTouchStart}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={handleTouchEnd}
-                  />
-                ))}
-              </div>
+              {!authLoading && !isLoading && user ? (
+                <>
+                  <div className="hidden lg:flex lg:justify-end mb-4">
+                    <button
+                      onClick={() => setIsModalOpen(true)}
+                      className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Job
+                    </button>
+                  </div>
+                  <div className="inline-flex space-x-4 pb-4 min-w-full">
+                    {initialColumns.map((column) => (
+                      <Column
+                        key={column.id}
+                        column={column}
+                        jobs={jobs}
+                        onDragStart={handleDragStart}
+                        onDragOver={handleDragOver}
+                        onDrop={handleDrop}
+                        onDeleteJob={handleDeleteJob}
+                        onTouchStart={handleTouchStart}
+                        onTouchMove={handleTouchMove}
+                        onTouchEnd={handleTouchEnd}
+                      />
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-10">Loading jobs...</div>
+              )}
             </div>
           </div>
         )}
