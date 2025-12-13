@@ -29,10 +29,13 @@ export function CompanyList({ onSelectCompany }: CompanyListProps) {
   const [isFrequencyMenuOpen, setIsFrequencyMenuOpen] = useState(false);
   const [updateFrequency, setUpdateFrequency] = useState<'daily' | 'weekly' | null>(null);
   const [isListVisible, setIsListVisible] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [draggedItem, setDraggedItem] = useState<Company | null>(null);
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
   const SCROLL_KEY = 'companiesScrollPosition';
+  const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Fetch companies from Supabase
   useEffect(() => {
@@ -108,6 +111,36 @@ export function CompanyList({ onSelectCompany }: CompanyListProps) {
       window.removeEventListener('focus', handleFocus);
     };
   }, [isLoading, companies.length]);
+
+  // Debounce search input
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(searchQuery.trim()), 250);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
+  // Auto-scroll to first match when debouncedQuery changes
+  useEffect(() => {
+    if (!debouncedQuery) return;
+    const lowered = debouncedQuery.toLowerCase();
+    const match = companies.find((c) => (c.company || c.custom_company || '').toLowerCase().includes(lowered));
+    if (match && itemRefs.current[match.id]) {
+      // ensure container scrolls to show the element
+      const el = itemRefs.current[match.id];
+      if (!el) return;
+      const container = listRef.current;
+      if (!container) return;
+      const elTop = el.offsetTop;
+      const elBottom = elTop + el.offsetHeight;
+      const viewTop = container.scrollTop;
+      const viewBottom = viewTop + container.clientHeight;
+      if (elTop < viewTop || elBottom > viewBottom) {
+        container.scrollTo({ top: elTop - 8, behavior: 'smooth' });
+      }
+      // briefly highlight
+      el.classList.add('ring-2', 'ring-indigo-300');
+      setTimeout(() => el.classList.remove('ring-2', 'ring-indigo-300'), 1200);
+    }
+  }, [debouncedQuery, companies]);
 
   const addNewRow = async () => {
     const newCompany = {
@@ -273,6 +306,24 @@ export function CompanyList({ onSelectCompany }: CompanyListProps) {
             </div>
           </div>
 
+          <div className="mb-3 flex items-center gap-2">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search companies..."
+              className="flex-1 p-2 text-sm border border-gray-300 rounded-md focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => { setSearchQuery(''); setDebouncedQuery(''); }}
+                className="px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-md hover:bg-gray-50"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
           <div
             ref={listRef}
             onScroll={() => {
@@ -290,9 +341,15 @@ export function CompanyList({ onSelectCompany }: CompanyListProps) {
                 if (!a.starred && b.starred) return 1;
                 return 0;
               })
+              .filter((c) => {
+                if (!debouncedQuery) return true;
+                const q = debouncedQuery.toLowerCase();
+                return (c.company || c.custom_company || '').toLowerCase().includes(q);
+              })
               .map((entry) => (
                 <div
                   key={entry.id}
+                  ref={(el) => (itemRefs.current[entry.id] = el)}
                   draggable
                   onDragStart={(e) => handleDragStart(e, entry)}
                   onDragEnd={handleDragEnd}
