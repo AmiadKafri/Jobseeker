@@ -31,6 +31,8 @@ export function CompanyList({ onSelectCompany }: CompanyListProps) {
   const [isListVisible, setIsListVisible] = useState(true);
   const [draggedItem, setDraggedItem] = useState<Company | null>(null);
   const [dragOverItemId, setDragOverItemId] = useState<string | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const SCROLL_KEY = 'companiesScrollPosition';
 
   // Fetch companies from Supabase
   useEffect(() => {
@@ -40,6 +42,48 @@ export function CompanyList({ onSelectCompany }: CompanyListProps) {
       .catch(() => setCompanies([]))
       .finally(() => setIsLoading(false));
   }, []);
+
+  // Restore scroll position after companies load and save on visibility change/unmount
+  useEffect(() => {
+    const ref = listRef.current;
+
+    const restore = () => {
+      try {
+        const val = sessionStorage.getItem(SCROLL_KEY);
+        if (ref && val) ref.scrollTop = parseInt(val, 10);
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    // Restore when companies list changes (e.g. initial load)
+    if (!isLoading) restore();
+
+    const handleVisibility = () => {
+      try {
+        if (document.visibilityState === 'hidden' && ref) {
+          sessionStorage.setItem(SCROLL_KEY, String(ref.scrollTop));
+        }
+        if (document.visibilityState === 'visible' && ref) {
+          const val = sessionStorage.getItem(SCROLL_KEY);
+          if (val) ref.scrollTop = parseInt(val, 10);
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      try {
+        if (ref) sessionStorage.setItem(SCROLL_KEY, String(ref.scrollTop));
+      } catch (e) {
+        // ignore
+      }
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [isLoading, companies.length]);
 
   const addNewRow = async () => {
     const newCompany = {
@@ -205,7 +249,17 @@ export function CompanyList({ onSelectCompany }: CompanyListProps) {
             </div>
           </div>
 
-          <div className="max-h-[calc(100vh-300px)] overflow-y-auto pr-2 space-y-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+          <div
+            ref={listRef}
+            onScroll={() => {
+              try {
+                if (listRef.current) sessionStorage.setItem(SCROLL_KEY, String(listRef.current.scrollTop));
+              } catch (e) {
+                // ignore
+              }
+            }}
+            className="max-h-[calc(100vh-300px)] overflow-y-auto pr-2 space-y-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
+          >
             {[...companies]
               .sort((a, b) => {
                 if (a.starred && !b.starred) return -1;
