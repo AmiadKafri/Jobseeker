@@ -36,6 +36,51 @@ export function CompanyList({ onSelectCompany }: CompanyListProps) {
   const listRef = useRef<HTMLDivElement | null>(null);
   const SCROLL_KEY = 'companiesScrollPosition';
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const pendingTimeouts = useRef<Record<string, number>>({});
+  const pendingPayloads = useRef<Record<string, Partial<Company>>>({});
+
+  const scheduleUpdate = (id: string, payload: Partial<Company>, delay = 500) => {
+    pendingPayloads.current[id] = { ...(pendingPayloads.current[id] || {}), ...payload };
+    const key = id;
+    if (pendingTimeouts.current[key]) {
+      window.clearTimeout(pendingTimeouts.current[key]);
+    }
+    pendingTimeouts.current[key] = window.setTimeout(async () => {
+      try {
+        const toSend = pendingPayloads.current[key];
+        if (!toSend) return;
+        const updated = await updateCompany(id, toSend as any);
+        setCompanies((prev) => prev.map((c) => (c.id === id ? updated : c)));
+      } catch (e) {
+        console.error('Failed to save company edit', e);
+      } finally {
+        delete pendingPayloads.current[key];
+        if (pendingTimeouts.current[key]) {
+          window.clearTimeout(pendingTimeouts.current[key]);
+          delete pendingTimeouts.current[key];
+        }
+      }
+    }, delay) as unknown as number;
+  };
+
+  const flushAllPending = async () => {
+    const keys = Object.keys(pendingPayloads.current);
+    for (const id of keys) {
+      const payload = pendingPayloads.current[id];
+      if (!payload) continue;
+      try {
+        const updated = await updateCompany(id, payload as any);
+        setCompanies((prev) => prev.map((c) => (c.id === id ? updated : c)));
+      } catch (e) {
+        console.error('Failed to flush company update', e);
+      }
+      if (pendingTimeouts.current[id]) {
+        window.clearTimeout(pendingTimeouts.current[id]);
+        delete pendingTimeouts.current[id];
+      }
+      delete pendingPayloads.current[id];
+    }
+  };
 
   // Fetch companies from Supabase
   useEffect(() => {
@@ -104,6 +149,12 @@ export function CompanyList({ onSelectCompany }: CompanyListProps) {
     return () => {
       try {
         if (ref) sessionStorage.setItem(SCROLL_KEY, String(ref.scrollTop));
+      } catch (e) {
+        // ignore
+      }
+      // flush any pending edits before unmounting
+      try {
+        flushAllPending();
       } catch (e) {
         // ignore
       }
@@ -377,10 +428,13 @@ export function CompanyList({ onSelectCompany }: CompanyListProps) {
                           value={entry.company}
                           onChange={(e) => {
                             const value = e.target.value;
-                            if (value === "custom") {
-                              updateCustomCompany(entry.id, entry.custom_company || "");
+                            // update local state immediately for snappy typing
+                            setCompanies((prev) => prev.map((c) => (c.id === entry.id ? { ...c, company: value, custom_company: value === 'custom' ? c.custom_company : '' } : c)));
+                            if (value === 'custom') {
+                              // schedule clearing company and keep custom_company (user will type)
+                              scheduleUpdate(entry.id, { company: '', custom_company: entry.custom_company || '' });
                             } else {
-                              updateCompanyName(entry.id, value);
+                              scheduleUpdate(entry.id, { company: value, custom_company: '' });
                             }
                           }}
                           className="w-full p-2 text-sm border border-gray-300 rounded-md focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
@@ -397,7 +451,11 @@ export function CompanyList({ onSelectCompany }: CompanyListProps) {
                           <input
                             type="text"
                             value={entry.custom_company}
-                            onChange={(e) => updateCustomCompany(entry.id, e.target.value)}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              setCompanies((prev) => prev.map((c) => (c.id === entry.id ? { ...c, custom_company: v } : c)));
+                              scheduleUpdate(entry.id, { custom_company: v, company: '' });
+                            }}
                             placeholder="Enter custom company name"
                             className="absolute inset-0 w-full p-2 text-sm border border-gray-300 rounded-md focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                           />
@@ -432,7 +490,11 @@ export function CompanyList({ onSelectCompany }: CompanyListProps) {
                       <input
                         type="url"
                         value={entry.link || ''}
-                        onChange={(e) => updateCompanyLink(entry.id, e.target.value)}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setCompanies((prev) => prev.map((c) => (c.id === entry.id ? { ...c, link: v } : c)));
+                          scheduleUpdate(entry.id, { link: v });
+                        }}
                         placeholder="Company website link (https://...)"
                         className="w-full p-2 text-sm border border-gray-300 rounded-md focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                       />
