@@ -47,17 +47,31 @@ export function CompanyList({ onSelectCompany }: CompanyListProps) {
   useEffect(() => {
     const ref = listRef.current;
 
-    const restore = () => {
-      try {
-        const val = sessionStorage.getItem(SCROLL_KEY);
-        if (ref && val) ref.scrollTop = parseInt(val, 10);
-      } catch (e) {
-        // ignore
-      }
+    const restoreOnce = (attempts = 5, delay = 50) => {
+      const tryRestore = (n: number) => {
+        try {
+          const val = sessionStorage.getItem(SCROLL_KEY);
+          if (ref && val) {
+            const pos = parseInt(val, 10);
+            ref.scrollTop = pos;
+            // If set, we're done. Otherwise retry until attempts exhausted.
+            if (ref.scrollTop === pos || n <= 1) return;
+          }
+        } catch (e) {
+          // ignore
+        }
+        if (n > 1) {
+          setTimeout(() => requestAnimationFrame(() => tryRestore(n - 1)), delay);
+        }
+      };
+      tryRestore(attempts);
     };
 
     // Restore when companies list changes (e.g. initial load)
-    if (!isLoading) restore();
+    if (!isLoading) {
+      // small delay to allow layout to settle
+      setTimeout(() => restoreOnce(), 0);
+    }
 
     const handleVisibility = () => {
       try {
@@ -65,15 +79,24 @@ export function CompanyList({ onSelectCompany }: CompanyListProps) {
           sessionStorage.setItem(SCROLL_KEY, String(ref.scrollTop));
         }
         if (document.visibilityState === 'visible' && ref) {
-          const val = sessionStorage.getItem(SCROLL_KEY);
-          if (val) ref.scrollTop = parseInt(val, 10);
+          // restore after focus/visibility to handle layout shifts
+          restoreOnce();
         }
       } catch (e) {
         // ignore
       }
     };
 
+    const handleFocus = () => {
+      try {
+        if (ref) restoreOnce();
+      } catch (e) {
+        // ignore
+      }
+    };
+
     document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleFocus);
 
     return () => {
       try {
@@ -82,6 +105,7 @@ export function CompanyList({ onSelectCompany }: CompanyListProps) {
         // ignore
       }
       document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleFocus);
     };
   }, [isLoading, companies.length]);
 
